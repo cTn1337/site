@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppRole {
+  USER
+  REVIEWER
+  ADMIN
+}
+
+enum RequestType {
+  STAFF
+  UNBAN
+  UNTIMEOUT
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+  NEED_MORE_INFO
+}
+
+model User {
+  id            String   @id @default(cuid())
+  discordUserId String   @unique
+  username      String
+  avatar        String?
+  email         String?
+  role          AppRole  @default(USER)
+  bannedFromApp Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  requests      Request[]
+  actions       RequestAction[] @relation("ReviewerActions")
+  notifications Notification[]
+}
+
+model Request {
+  id           String        @id @default(cuid())
+  type         RequestType
+  status       RequestStatus @default(PENDING)
+  answers      Json
+  reviewReason String?
+  needMoreInfoMessage String?
+
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+
+  reviewedById String?
+  reviewedBy   User?        @relation("ReviewerActions", fields: [reviewedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  actions RequestAction[]
+}
+
+model RequestAction {
+  id        String @id @default(cuid())
+  requestId String
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  actorId   String
+  actor     User   @relation(fields: [actorId], references: [id])
+
+  fromStatus RequestStatus?
+  toStatus   RequestStatus
+  reason     String?
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+model AppConfig {
+  id String @id @default("singleton")
+  serverName String @default("Discord Requests")
+  discordWebhookUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
